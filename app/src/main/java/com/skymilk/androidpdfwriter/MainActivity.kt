@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.res.ResourcesCompat
@@ -33,6 +34,7 @@ import com.itextpdf.layout.element.Table
 import com.itextpdf.layout.property.ListNumberingType
 import com.itextpdf.layout.property.TextAlignment
 import com.skymilk.androidpdfwriter.ui.theme.AndroidPdfWriterTheme
+import kotlinx.coroutines.launch
 import java.io.File
 
 
@@ -49,41 +51,49 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+
+                    val scope = rememberCoroutineScope()
+
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Button(onClick = {
-                            pdfDocumentGenerator.generateInvoicePdf(
-                                invoice = Invoice(
-                                    number = 7877859L,
-                                    price = 885.0f,
-                                    link = "https://www.google.com",
-                                    date = "Tue 4th Aug, 2020",
-                                    from = PersonInfo(
-                                        name = "Leslie Alexander",
-                                        address = "2972 Westheimer Rd. Santa Ana, IIlinois 85486"
-                                    ),
-                                    to = PersonInfo(
-                                        name = "Marvin McKinney",
-                                        address = "2972 Westheimer Rd. Santa Ana, IIlinois 85486"
-                                    ),
-                                    listOf(
-                                        Product(
-                                            description = "Dashboard Design",
-                                            rate = 779.58f,
-                                            quantity = 1
+
+                            scope.launch {
+
+                                pdfDocumentGenerator.generateInvoicePdf(
+                                    invoice = Invoice(
+                                        number = 7877859L,
+                                        price = 885.0f,
+                                        link = "https://www.google.com",
+                                        date = "Tue 4th Aug, 2020",
+                                        from = PersonInfo(
+                                            name = "Leslie Alexander",
+                                            address = "2972 Westheimer Rd. Santa Ana, IIlinois 85486"
                                         ),
-                                        Product(
-                                            description = "Logo Design",
-                                            rate = 106.58f,
-                                            quantity = 2
+                                        to = PersonInfo(
+                                            name = "Marvin McKinney",
+                                            address = "2972 Westheimer Rd. Santa Ana, IIlinois 85486"
                                         ),
-                                        Product(
-                                            description = "Thumbnail Design",
-                                            rate = 22.3f,
-                                            quantity = 1
+                                        listOf(
+                                            Product(
+                                                description = "Dashboard Design",
+                                                rate = 779.58f,
+                                                quantity = 1
+                                            ),
+                                            Product(
+                                                description = "Logo Design",
+                                                rate = 106.58f,
+                                                quantity = 2
+                                            ),
+                                            Product(
+                                                description = "Thumbnail Design",
+                                                rate = 22.3f,
+                                                quantity = 1
+                                            ),
                                         ),
+                                        signatureUrl = "https://w7.pngwing.com/pngs/962/173/png-transparent-signature-signature-miscellaneous-angle-material.png"
                                     )
                                 )
-                            )
+                            }
                         }) {
                             Text(text = "저장하기")
                         }
