@@ -1,10 +1,13 @@
 package com.skymilk.androidpdfwriter
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.widget.Toast
+import com.itextpdf.io.font.PdfEncodings
 import com.itextpdf.io.image.ImageDataFactory
 import com.itextpdf.kernel.colors.Color
 import com.itextpdf.kernel.colors.DeviceRgb
+import com.itextpdf.kernel.font.PdfFont
+import com.itextpdf.kernel.font.PdfFontFactory
 import com.itextpdf.kernel.geom.PageSize
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
@@ -26,20 +29,40 @@ import com.itextpdf.layout.property.TextAlignment
 import com.itextpdf.layout.property.VerticalAlignment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URL
+import java.text.DecimalFormat
 
+
+@SuppressLint("ResourceType")
 class PdfDocumentGenerator(
     private val context: Context
 ) {
 
-    suspend fun generateInvoicePdf(invoice: Invoice) {
+    //한글 처리를 위한 지정 폰트
+    //배민 한나 프로
+    private var fontHannaPro: PdfFont
 
+    //원화 콤마 표기
+    private var commaDecimal = DecimalFormat("#,###")
+
+    init {
+        // 폰트 파일 로드
+        val fontStream: InputStream = context.resources.openRawResource(R.font.bm_hanna_pro)
+        fontHannaPro = PdfFontFactory.createFont(
+            fontStream.readBytes(),
+            PdfEncodings.IDENTITY_H,
+            PdfFontFactory.EmbeddingStrategy.FORCE_EMBEDDED
+        )
+    }
+
+    suspend fun generateInvoicePdf(invoice: Invoice, outputStream: OutputStream) {
         //이미지를 불러오기 위한 네트워크 통신을 위해 IO 디스패처
         withContext(Dispatchers.IO) {
 
-            val outputFile = File(context.filesDir, "invoice.pdf")
-            val pdfWriter = PdfWriter(outputFile)
+//            val outputFile = File(context.filesDir, "invoice.pdf")
+            val pdfWriter = PdfWriter(outputStream)
             val pdfDocument = PdfDocument(pdfWriter)
             val document = Document(pdfDocument, PageSize(650f, 700f)).apply {// 페이지 사이즈
                 setMargins(50f, 13f, 13f, 13f) // 여백 설정
@@ -53,17 +76,21 @@ class PdfDocumentGenerator(
             val page = pdfDocument.addNewPage()
 
             //거래 명세서 번호
-            val invoiceNumber = Paragraph("Invoice #${invoice.number}")
-                .setBold()
-                .setFontSize(32f)
+            val invoiceNumber = Paragraph("Invoice #${invoice.number}").apply {
+                setBold()
+                setFontSize(32f)
+                setFont(fontHannaPro)
+            }
 
             // 결제 날짜
             val invoiceDate = createLightTextParagraph(invoice.date)
 
             // 결제 링크
-            val payLink = Link("Pay $${invoice.price}", PdfAction.createURI(invoice.link))
-                .setTextAlignment(TextAlignment.RIGHT)
-                .setFontColor(DeviceRgb.WHITE)
+            val payLink = Link("결제 하기", PdfAction.createURI(invoice.link)).apply {
+                setTextAlignment(TextAlignment.RIGHT)
+                setFontColor(DeviceRgb.WHITE)
+                setFont(fontHannaPro)
+            }
 
             // 결제 버튼
             val payParagraph = Paragraph().apply {
@@ -125,11 +152,10 @@ class PdfDocumentGenerator(
 
             //상품 목록 영역 타이틀
             val descriptionTitle =
-                createBoldTextParagraph("Description").setTextAlignment(TextAlignment.LEFT)
-            val rateTitle = createBoldTextParagraph("Rate").setTextAlignment(TextAlignment.CENTER)
-            val qtyTitle = createBoldTextParagraph("QTY").setTextAlignment(TextAlignment.CENTER)
-            val subTotalTitle =
-                createBoldTextParagraph("SUBTOTAL").setTextAlignment(TextAlignment.RIGHT)
+                createBoldTextParagraph("상품명").setTextAlignment(TextAlignment.CENTER)
+            val rateTitle = createBoldTextParagraph("단가").setTextAlignment(TextAlignment.CENTER)
+            val qtyTitle = createBoldTextParagraph("수량").setTextAlignment(TextAlignment.CENTER)
+            val subTotalTitle = createBoldTextParagraph("소계").setTextAlignment(TextAlignment.CENTER)
 
             //구매/판매자 영역 테이블
             val productsTable = Table(4, true).apply {
@@ -151,22 +177,22 @@ class PdfDocumentGenerator(
                 val description = createBoldTextParagraph(
                     product.description,
                     lightBlack
-                ).setTextAlignment(TextAlignment.LEFT)
+                ).setTextAlignment(TextAlignment.CENTER)
 
                 val rate = createBoldTextParagraph(
-                    "$${product.rate}",
+                    "${commaDecimal.format(product.rate)}원",
                     lightBlack
                 ).setTextAlignment(TextAlignment.CENTER)
 
                 val qty = createBoldTextParagraph(
-                    product.quantity.toString(),
+                    commaDecimal.format(product.quantity),
                     lightBlack
                 ).setTextAlignment(TextAlignment.CENTER)
 
                 val subTotal = createBoldTextParagraph(
-                    "$${product.rate * product.quantity}",
+                    "${commaDecimal.format(product.rate * product.quantity)}원",
                     lightBlack
-                ).setTextAlignment(TextAlignment.RIGHT)
+                ).setTextAlignment(TextAlignment.CENTER)
 
                 //상품별 정보 셀 추가
                 productsTable.addCell(createProductTableCell(description))
@@ -176,7 +202,7 @@ class PdfDocumentGenerator(
             }
 
             //총 합계 비용 영역
-            val grandTotal = createLightTextParagraph("Grand Total").apply {
+            val grandTotal = createLightTextParagraph("총 합계").apply {
                 setFontColor(DeviceRgb(166, 166, 166))
                 setFontSize(16f)
                 setTextAlignment(TextAlignment.RIGHT)
@@ -209,7 +235,7 @@ class PdfDocumentGenerator(
 
             //총 합계 가격 정보 추가
             val totalPrice =
-                createBoldTextParagraph("$${getTotalPrice(invoice.products)}").setBold()
+                createBoldTextParagraph("${getTotalPrice(invoice.products)}원").setBold()
                     .setTextAlignment(TextAlignment.RIGHT)
             val totalPriceCell =
                 Cell(1, if (invoice.signatureUrl == null) 4 else 2).apply {
@@ -233,6 +259,7 @@ class PdfDocumentGenerator(
         val lightTextStyle = Style().apply {
             setFontSize(12f)
             setFontColor(DeviceRgb(166, 166, 166)) // 회색
+            setFont(fontHannaPro)
         }
         return Paragraph(text).addStyle(lightTextStyle)
     }
@@ -244,6 +271,7 @@ class PdfDocumentGenerator(
             setFontColor(color)
             setVerticalAlignment(VerticalAlignment.MIDDLE)
             setBold()
+            setFont(fontHannaPro)
         }
         return Paragraph(text).addStyle(boldTextStyle)
     }
@@ -275,11 +303,11 @@ class PdfDocumentGenerator(
     }
 
     //총 합계 가격 구하기
-    private fun getTotalPrice(products: List<Product>): Float {
-        var totalPrice = 0f
+    private fun getTotalPrice(products: List<Product>): String {
+        var totalPrice = 0
 
         products.forEach { totalPrice += it.rate * it.quantity }
 
-        return totalPrice
+        return commaDecimal.format(totalPrice)
     }
 }

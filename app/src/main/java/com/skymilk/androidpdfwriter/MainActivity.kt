@@ -1,11 +1,14 @@
 package com.skymilk.androidpdfwriter
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
@@ -15,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import com.itextpdf.io.font.constants.StandardFonts
 import com.itextpdf.kernel.colors.DeviceRgb
@@ -47,52 +51,96 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AndroidPdfWriterTheme {
+                val context = LocalContext.current
+                val scope = rememberCoroutineScope()
+                val createDocumentLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult(),
+                    onResult = {
+                        //지정 경로 정보의 유효성을 체크한다
+                        it.data?.data?.let {
+                            context.contentResolver.openOutputStream(it)?.let {
+
+                                scope.launch {
+                                    pdfDocumentGenerator.generateInvoicePdf(
+                                        outputStream = it,
+                                        invoice = Invoice(
+                                            number = 7877859L,
+                                            price = 885.0f,
+                                            link = "https://www.google.com",
+                                            date = "2024-07-17 수요일",
+                                            from = PersonInfo(
+                                                name = "박인협",
+                                                address = "서울시 강동구 강일동 599-10"
+                                            ),
+                                            to = PersonInfo(
+                                                name = "개발스토어",
+                                                address = "서울시 강동구 강일동 599-10"
+                                            ),
+                                            listOf(
+                                                Product(
+                                                    description = "대시보드 디자인",
+                                                    rate = 900000,
+                                                    quantity = 5
+                                                ),
+                                                Product(
+                                                    description = "로고 디자인",
+                                                    rate = 180000,
+                                                    quantity = 2
+                                                ),
+                                                Product(
+                                                    description = "썸네일 디자인",
+                                                    rate = 250000,
+                                                    quantity = 1
+                                                ),
+//                                                Product(
+//                                                    description = "아이콘 디자인",
+//                                                    rate = 60000,
+//                                                    quantity = 10
+//                                                ),
+//                                                Product(
+//                                                    description = "서버",
+//                                                    rate = 4000000,
+//                                                    quantity = 2
+//                                                ),
+//                                                Product(
+//                                                    description = "서버 관리",
+//                                                    rate = 1300000,
+//                                                    quantity = 1
+//                                                ),
+//                                                Product(
+//                                                    description = "서비스 개발",
+//                                                    rate = 3000000,
+//                                                    quantity = 1
+//                                                ),
+//                                                Product(
+//                                                    description = "서비스 운영",
+//                                                    rate = 550000,
+//                                                    quantity = 1
+//                                                ),
+                                            ),
+                                            signatureUrl = "https://w7.pngwing.com/pngs/962/173/png-transparent-signature-signature-miscellaneous-angle-material.png"
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
 
-                    val scope = rememberCoroutineScope()
 
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Button(onClick = {
-
-                            scope.launch {
-
-                                pdfDocumentGenerator.generateInvoicePdf(
-                                    invoice = Invoice(
-                                        number = 7877859L,
-                                        price = 885.0f,
-                                        link = "https://www.google.com",
-                                        date = "Tue 4th Aug, 2020",
-                                        from = PersonInfo(
-                                            name = "Leslie Alexander",
-                                            address = "2972 Westheimer Rd. Santa Ana, IIlinois 85486"
-                                        ),
-                                        to = PersonInfo(
-                                            name = "Marvin McKinney",
-                                            address = "2972 Westheimer Rd. Santa Ana, IIlinois 85486"
-                                        ),
-                                        listOf(
-                                            Product(
-                                                description = "Dashboard Design",
-                                                rate = 779.58f,
-                                                quantity = 1
-                                            ),
-                                            Product(
-                                                description = "Logo Design",
-                                                rate = 106.58f,
-                                                quantity = 2
-                                            ),
-                                            Product(
-                                                description = "Thumbnail Design",
-                                                rate = 22.3f,
-                                                quantity = 1
-                                            ),
-                                        ),
-                                        signatureUrl = "https://w7.pngwing.com/pngs/962/173/png-transparent-signature-signature-miscellaneous-angle-material.png"
-                                    )
-                                )
+                            Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                type = "application/pdf" //intent 타입 지정
+                                putExtra(Intent.EXTRA_TITLE, "invoice.pdf") // 기본 파일명
+                            }.also {
+                                createDocumentLauncher.launch(it)
                             }
                         }) {
                             Text(text = "저장하기")
@@ -105,7 +153,7 @@ class MainActivity : ComponentActivity() {
 }
 
 
-//PDF 문서 생성 테스트
+//PDF 문서 생성 기능 테스트
 private fun createPdfLearn(context: Context) {
     val outputFile = File(context.filesDir, "createTest.pdf")
     val pdfWriter = PdfWriter(outputFile)

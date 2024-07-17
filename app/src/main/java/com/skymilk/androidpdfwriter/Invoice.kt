@@ -18,6 +18,6 @@ data class PersonInfo(
 
 data class Product(
     val description: String,
-    val rate: Float,
+    val rate: Int,
     val quantity: Int
 )
